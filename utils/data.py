@@ -44,7 +44,7 @@ def get_date(current_day):
     
     return today, update_date, format_date
 
-def get_data(url=URL):
+def get_data(filter=True, url=URL):
     try: # today date
         now = datetime.datetime.now()
         format_date, human_date, save_date = get_date(now)
@@ -53,15 +53,23 @@ def get_data(url=URL):
         yesterday = datetime.datetime.now() - datetime.timedelta(1)
         format_date, human_date, save_date = get_date(yesterday)
         dt = pd.read_csv(url.format(format_date))
-    dt_ecowas = dt[dt["Country_Region"].isin(COUNTRIES)]
-    dt_ecowas = dt_ecowas.drop(REMOVED, axis=1)
-    dt_ecowas = dt_ecowas.reset_index().drop(["index"], axis=1)
-    dt_ecowas["Active"] = dt_ecowas["Active"].apply(int)
-    dt_ecowas["Confirmed"] = dt_ecowas["Confirmed"].apply(int)
-    dt_ecowas["Deaths"] = dt_ecowas["Deaths"].apply(int)
-    dt_ecowas["Recovered"] = dt_ecowas["Recovered"].apply(int)
+    if filter:
+        dt = dt[dt["Country_Region"].isin(COUNTRIES)]
+    # Remove columns
+    dt = dt.drop(REMOVED, axis=1)
+    # Reset index
+    dt = dt.reset_index().drop(["index"], axis=1)
+    # Remove NA
+    dt = dt.dropna()
+    try:
+        dt["Active"] = dt["Active"].apply(int)
+        dt["Confirmed"] = dt["Confirmed"].apply(int)
+        dt["Deaths"] = dt["Deaths"].apply(int)
+        dt["Recovered"] = dt["Recovered"].apply(int)
+    except:
+        pass
     # Compute bulles size on the map
-    quartiles = [dt_ecowas["Confirmed"].quantile(q) for q in [.25, .5, .75, 1]]
+    quartiles = [dt["Confirmed"].quantile(q) for q in [.25, .5, .75, 1]]
     def get_size(v):
         if v < quartiles[0]:
             return 1
@@ -71,7 +79,7 @@ def get_data(url=URL):
             return 3
         if v <= quartiles[3]:
             return 4
-    dt_ecowas["MapSize"] = dt_ecowas["Confirmed"].apply(get_size)
-    dt_ecowas = dict(eval(dt_ecowas.to_json(orient='index')))
+    dt["MapSize"] = dt["Confirmed"].apply(get_size)
+    dt = dict(eval(dt.to_json(orient='index')))
 
-    return list(dt_ecowas.values()), human_date
+    return list(dt.values()), human_date
